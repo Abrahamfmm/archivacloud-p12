@@ -19,29 +19,43 @@ const Upload = () => {
   }, []);
 
   const handleUpload = async () => {
-    if (!file) return;
+  if (!file) return;
 
-    try {
-      const response = await axios.post('http://127.0.0.1:8000/api/upload/presigned-url', {
-        fileName: file.name,
-        fileType: file.type
-      });
+  try {
+    // 1. Solicitar la URL prefirmada enviando un tipo estándar
+    const response = await axios.post('http://127.0.0.1:8000/api/upload/presigned-url', {
+      fileName: file.name,
+      fileType: 'application/octet-stream'
+    });
 
-      const { presignedUrl } = response.data;
+    const { presignedUrl } = response.data;
 
-      await axios.put(presignedUrl, file, {
-        headers: { 'Content-Type': file.type }
-      });
+    // 2. SOLUCIÓN: Envolver el archivo en un Blob binario puro de tipo application/octet-stream
+    // Esto garantiza que el navegador envíe EXACTAMENTE lo que S3 espera recibir en la firma
+    const fileBlob = new Blob([file], { type: 'application/octet-stream' });
 
-      alert('¡Archivo subido con éxito!');
-      setFile(null); 
-      fetchFiles(); 
-      
-    } catch (error) {
-      alert("Error al subir archivo.");
-      console.error(error);
+    // 3. Ejecutar la subida directa con FETCH
+    const uploadResult = await fetch(presignedUrl, {
+      method: 'PUT',
+      body: fileBlob,
+      headers: {
+        'Content-Type': 'application/octet-stream' // Coincidencia matemática 1:1 con el Backend
+      }
+    });
+
+    if (!uploadResult.ok) {
+      throw new Error(`S3 respondió con estatus: ${uploadResult.status}`);
     }
-  };
+
+    alert('¡Archivo subido con éxito a AWS S3!');
+    setFile(null); 
+    fetchFiles(); // Refrescar la lista de archivos automáticamente
+    
+  } catch (error) {
+    alert("Error al subir archivo. Revisa los detalles en la consola.");
+    console.error("Detalle del fallo de subida:", error);
+  }
+};
 
   const handleDelete = async (filename) => {
     if (window.confirm(`¿Seguro que deseas borrar ${filename}?`)) {
