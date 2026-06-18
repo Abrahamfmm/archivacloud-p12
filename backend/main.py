@@ -5,6 +5,7 @@ from botocore.client import Config
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 # 1. Forzar la ruta absoluta de la carpeta donde está este main.py
 BASE_DIR = Path(__file__).resolve().parent
@@ -32,6 +33,13 @@ BUCKET_NAME = os.getenv('BUCKET_NAME')
 if not BUCKET_NAME:
     print("⚠️ ADVERTENCIA: No se encontró BUCKET_NAME en las variables de entorno.\n")
 
+# Configuración de CORS para permitir que el frontend (React) se conecte
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Permite cualquier origen en desarrollo
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Configuración del cliente S3
 s3_client = boto3.client(
     's3',
@@ -81,3 +89,37 @@ def generate_presigned_url(request: UploadRequest):
         print("--- ERROR DETALLADO DE BOTO3 ---")
         traceback.print_exc() 
         raise HTTPException(status_code=500, detail="Error interno al generar la URL.")
+    
+# --- Endpoint GET para listar archivos ---
+@app.get("/api/files")
+def list_files():
+    try:
+        response = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix="uploads/")
+        files = []
+        if 'Contents' in response:
+            for item in response['Contents']:
+                if item['Key'] != "uploads/": 
+                    filename = item['Key'].replace("uploads/", "")
+                    public_url = f"https://{BUCKET_NAME}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/{item['Key']}"
+                    
+                    files.append({
+                        "filename": filename,
+                        "key": item['Key'],
+                        "url": public_url,
+                        "size": item['Size']
+                    })
+        return files
+    except Exception as e:
+        print("Error al listar:", e)
+        raise HTTPException(status_code=500, detail="Error interno al listar archivos.")
+
+# --- Endpoint DELETE para borrar un archivo ---
+@app.delete("/api/files/{filename}")
+def delete_file(filename: str):
+    object_key = f"uploads/{filename}"
+    try:
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=object_key)
+        return {"message": f"Archivo {filename} eliminado exitosamente."}
+    except Exception as e:
+        print("Error al eliminar:", e)
+        raise HTTPException(status_code=500, detail="Error interno al eliminar el archivo.")
