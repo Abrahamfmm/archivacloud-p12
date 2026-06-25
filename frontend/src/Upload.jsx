@@ -1,82 +1,89 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const Upload = () => {
+const Upload = ({ token }) => {
   const [file, setFile] = useState(null);
   const [fileList, setFileList] = useState([]);
 
+  // Configuración de cabeceras para autenticación
+  const authHeaders = {
+    headers: { Authorization: `Bearer ${token}` }
+  };
+
   const fetchFiles = async () => {
     try {
-      const response = await axios.get('http://127.0.0.1:8000/api/files');
+      const response = await axios.get('http://127.0.0.1:8000/api/files', authHeaders);
       setFileList(response.data);
     } catch (error) {
       console.error("Error cargando archivos", error);
+      alert("Tu sesión ha expirado o no tienes permisos.");
     }
   };
 
   useEffect(() => {
     fetchFiles();
-  }, []);
+  }, [token]);
 
   const handleUpload = async () => {
-  if (!file) return;
+    if (!file) return;
 
-  try {
-    // 1. Solicitar la URL prefirmada enviando un tipo estándar
-    const response = await axios.post('http://127.0.0.1:8000/api/upload/presigned-url', {
-      fileName: file.name,
-      fileType: 'application/octet-stream'
-    });
+    try {
+      // 1. Solicitar la URL prefirmada (PROTEGIDO CON TOKEN)
+      const response = await axios.post('http://127.0.0.1:8000/api/upload/presigned-url', {
+        fileName: file.name,
+        fileType: 'application/octet-stream'
+      }, authHeaders);
 
-    const { presignedUrl } = response.data;
+      const { presignedUrl } = response.data;
 
-    // 2. SOLUCIÓN: Envolver el archivo en un Blob binario puro de tipo application/octet-stream
-    // Esto garantiza que el navegador envíe EXACTAMENTE lo que S3 espera recibir en la firma
-    const fileBlob = new Blob([file], { type: 'application/octet-stream' });
+      // 2. Envolver el archivo en un Blob binario puro
+      const fileBlob = new Blob([file], { type: 'application/octet-stream' });
 
-    // 3. Ejecutar la subida directa con FETCH
-    const uploadResult = await fetch(presignedUrl, {
-      method: 'PUT',
-      body: fileBlob,
-      headers: {
-        'Content-Type': 'application/octet-stream' // Coincidencia matemática 1:1 con el Backend
+      // 3. Ejecutar la subida directa a S3 (Esto NO requiere token, ya está firmado)
+      const uploadResult = await fetch(presignedUrl, {
+        method: 'PUT',
+        body: fileBlob,
+        headers: {
+          'Content-Type': 'application/octet-stream'
+        }
+      });
+
+      if (!uploadResult.ok) {
+        throw new Error(`S3 respondió con estatus: ${uploadResult.status}`);
       }
-    });
 
-    if (!uploadResult.ok) {
-      throw new Error(`S3 respondió con estatus: ${uploadResult.status}`);
+      alert('¡Archivo subido con éxito a AWS S3!');
+      setFile(null); 
+      fetchFiles(); 
+      
+    } catch (error) {
+      alert("Error al subir archivo. Revisa los detalles en la consola.");
+      console.error("Detalle del fallo de subida:", error);
     }
-
-    alert('¡Archivo subido con éxito a AWS S3!');
-    setFile(null); 
-    fetchFiles(); // Refrescar la lista de archivos automáticamente
-    
-  } catch (error) {
-    alert("Error al subir archivo. Revisa los detalles en la consola.");
-    console.error("Detalle del fallo de subida:", error);
-  }
-};
+  };
 
   const handleDelete = async (filename) => {
     if (window.confirm(`¿Seguro que deseas borrar ${filename}?`)) {
       try {
-        await axios.delete(`http://127.0.0.1:8000/api/files/${filename}`);
+        // 4. Petición DELETE (PROTEGIDO CON TOKEN)
+        await axios.delete(`http://127.0.0.1:8000/api/files/${filename}`, authHeaders);
         alert('Archivo eliminado');
         fetchFiles();
       } catch (error) {
         console.error("Error al eliminar", error);
+        alert("No se pudo eliminar el archivo.");
       }
     }
   };
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-      <h2>ArchivaCloud P-12 - Sprint 2</h2>
+      <h2>ArchivaCloud P-12 - Sprint 3 (Seguridad)</h2>
       
-      <div style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ccc' }}>
+      <div style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ccc', borderRadius: '8px' }}>
         <h3>Subir Archivo</h3>
         <input type="file" onChange={(e) => setFile(e.target.files[0])} />
-        <button onClick={handleUpload}>Subir a S3</button>
+        <button onClick={handleUpload} style={{ marginLeft: '10px' }}>Subir a S3</button>
       </div>
 
       <h3>Archivos en el Bucket</h3>
@@ -90,7 +97,10 @@ const Upload = () => {
                 {f.filename}
               </a>
               {" "} - {(f.size / 1024).toFixed(2)} KB {" "}
-              <button onClick={() => handleDelete(f.filename)} style={{ color: 'red', marginLeft: '10px' }}>
+              <button 
+                onClick={() => handleDelete(f.filename)} 
+                style={{ color: 'white', backgroundColor: '#dc3545', border: 'none', marginLeft: '10px', cursor: 'pointer', padding: '2px 8px', borderRadius: '4px' }}
+              >
                 Borrar
               </button>
             </li>
