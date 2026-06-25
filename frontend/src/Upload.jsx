@@ -75,7 +75,31 @@ const Upload = ({ token }) => {
       }
     }
   };
+  const handleRename = async (oldFilename) => {
+    // Pedimos el nuevo nombre mediante un prompt nativo del navegador
+    const newFilename = window.prompt(
+      `Ingresa el nuevo nombre para "${oldFilename}"\n(No olvides incluir la extensión .docx, .odt o .rtf):`, 
+      oldFilename
+    );
 
+    // Si el usuario cancela o no cambia el nombre, no hacemos nada
+    if (!newFilename || newFilename === oldFilename) return;
+
+    try {
+      // Enviamos el PUT con el nuevo nombre y los headers de seguridad (token)
+      await axios.put(`http://127.0.0.1:8000/api/files/${oldFilename}/rename`, 
+        { newFilename: newFilename }, 
+        authHeaders
+      );
+      alert('¡Archivo renombrado con éxito!');
+      fetchFiles(); // Recargamos la lista
+    } catch (error) {
+      console.error("Error al renombrar", error);
+      // Mostramos el mensaje de error del backend (ej. si puso mal la extensión)
+      alert(error.response?.data?.detail || "No se pudo renombrar el archivo.");
+    }
+  };
+  
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial' }}>
       <h2>ArchivaCloud P-12 - Sprint 3 (Seguridad)</h2>
@@ -97,9 +121,19 @@ const Upload = ({ token }) => {
                 {f.filename}
               </a>
               {" "} - {(f.size / 1024).toFixed(2)} KB {" "}
+              
+              {/* Botón Renombrar (Feature P-12) */}
+              <button 
+                onClick={() => handleRename(f.filename)} 
+                style={{ color: 'black', backgroundColor: '#ffc107', border: 'none', marginLeft: '15px', cursor: 'pointer', padding: '2px 8px', borderRadius: '4px' }}
+              >
+                Renombrar
+              </button>
+
+              {/* Botón Borrar */}
               <button 
                 onClick={() => handleDelete(f.filename)} 
-                style={{ color: 'white', backgroundColor: '#dc3545', border: 'none', marginLeft: '10px', cursor: 'pointer', padding: '2px 8px', borderRadius: '4px' }}
+                style={{ color: 'white', backgroundColor: '#dc3545', border: 'none', marginLeft: '5px', cursor: 'pointer', padding: '2px 8px', borderRadius: '4px' }}
               >
                 Borrar
               </button>
