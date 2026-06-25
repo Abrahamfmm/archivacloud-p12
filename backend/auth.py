@@ -1,10 +1,10 @@
 import os
 from datetime import datetime, timedelta
 import jwt
+import bcrypt  
 from passlib.context import CryptContext
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-
 # Configuración de encriptación
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
