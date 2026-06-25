@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 import boto3
 from botocore.client import Config
@@ -6,6 +6,12 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+
+# Importaciones de nuestro nuevo módulo de seguridad (Sprint 3)
+from auth import get_password_hash, verify_password, create_access_token, get_current_user
+
+# --- Base de datos simulada en memoria ---
+DB_USUARIOS = {}
 
 # 1. Forzar la ruta absoluta de la carpeta donde está este main.py
 BASE_DIR = Path(__file__).resolve().parent
@@ -20,20 +26,21 @@ if dotenv_path.exists():
     print("✅ ¡El archivo .env FÍSICAMENTE SÍ EXISTE en esa carpeta!")
 else:
     print("❌ El archivo '.env' NO existe con ese nombre exacto.")
-    print(f"Archivos reales detectados en esta carpeta: {os.listdir(BASE_DIR)}")
 print("===============================\n")
 
 # 2. Cargar el .env usando la ruta absoluta calculada
 load_dotenv(dotenv_path=dotenv_path)
 
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], # Tu frontend React
     allow_credentials=True,
     allow_methods=["*"], # Permite POST, GET, OPTIONS, PUT, DELETE
-    allow_headers=["*"], # Permite todos los headers (Content-Type, etc.)
+    allow_headers=["*"], # Permite todos los headers (Content-Type, Authorization, etc.)
 )
+
 BUCKET_NAME = os.getenv('BUCKET_NAME')
 
 if not BUCKET_NAME:
@@ -52,12 +59,53 @@ s3_client = boto3.client(
     config=Config(signature_version='s3v4')
 )
 
+# ==========================================
+# MODELOS DE DATOS (Pydantic)
+# ==========================================
 class UploadRequest(BaseModel):
     fileName: str
     fileType: str
 
+class UserAuth(BaseModel):
+    username: str
+    password: str
+
+
+# ==========================================
+# ENDPOINTS DE AUTENTICACIÓN (SPRINT 3)
+# ==========================================
+@app.post("/api/auth/register")
+def register(user: UserAuth):
+    if user.username in DB_USUARIOS:
+        raise HTTPException(status_code=400, detail="El usuario ya existe")
+    
+    # Guardamos el usuario con contraseña encriptada
+    DB_USUARIOS[user.username] = {
+        "username": user.username,
+        "password": get_password_hash(user.password)
+    }
+    return {"message": "Usuario registrado exitosamente"}
+
+@app.post("/api/auth/login")
+def login(user: UserAuth):
+    usuario_encontrado = DB_USUARIOS.get(user.username)
+    if not usuario_encontrado or not verify_password(user.password, usuario_encontrado["password"]):
+        raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos")
+    
+    # Generamos el token JWT
+    token = create_access_token(data={"sub": user.username})
+    return {"access_token": token, "token_type": "bearer"}
+
+
+# ==========================================
+# ENDPOINTS PROTEGIDOS DE AWS S3 (SPRINT 2 + 3)
+# ==========================================
+
+# Notarás que agregamos "user: str = Depends(get_current_user)" a las funciones de abajo.
+# Esto obliga a FastAPI a pedir un token JWT válido antes de ejecutar el código.
+
 @app.post("/api/upload/presigned-url")
-def generate_presigned_url(request: UploadRequest):
+def generate_presigned_url(request: UploadRequest, user: str = Depends(get_current_user)):
     allowed_extensions = ['.docx', '.odt', '.rtf']
     _, ext = os.path.splitext(request.fileName)
     if ext.lower() not in allowed_extensions:
@@ -93,9 +141,9 @@ def generate_presigned_url(request: UploadRequest):
         traceback.print_exc() 
         raise HTTPException(status_code=500, detail="Error interno al generar la URL.")
     
-# --- Endpoint GET para listar archivos ---
+# --- Endpoint GET para listar archivos (PROTEGIDO) ---
 @app.get("/api/files")
-def list_files():
+def list_files(user: str = Depends(get_current_user)):
     try:
         # Intentar listar los objetos del bucket en AWS
         response = s3_client.list_objects_v2(Bucket=BUCKET_NAME)
@@ -117,14 +165,15 @@ def list_files():
     except Exception as e:
         import traceback
         print("--- 🚨 ERROR CRÍTICO EN /api/files ---")
-        traceback.print_exc() # Esto imprimirá el error real en tu terminal de VS Code
+        traceback.print_exc() 
         raise HTTPException(
             status_code=500, 
             detail=f"Error al conectar con S3: {str(e)}. ¡Revisa si tus credenciales .env expiraron!"
         )
-# --- Endpoint DELETE para borrar un archivo ---
+
+# --- Endpoint DELETE para borrar un archivo (PROTEGIDO) ---
 @app.delete("/api/files/{filename}")
-def delete_file(filename: str):
+def delete_file(filename: str, user: str = Depends(get_current_user)):
     object_key = f"uploads/{filename}"
     try:
         s3_client.delete_object(Bucket=BUCKET_NAME, Key=object_key)
