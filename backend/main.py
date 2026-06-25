@@ -70,6 +70,8 @@ class UserAuth(BaseModel):
     username: str
     password: str
 
+class RenameRequest(BaseModel):
+    newFilename: str
 
 # ==========================================
 # ENDPOINTS DE AUTENTICACIÓN (SPRINT 3)
@@ -96,6 +98,43 @@ def login(user: UserAuth):
     token = create_access_token(data={"sub": user.username})
     return {"access_token": token, "token_type": "bearer"}
 
+# --- Nuevo Endpoint PUT para renombrar archivos (Feature P-12) ---
+@app.put("/api/files/{filename}/rename")
+def rename_file(filename: str, request: RenameRequest, user: str = Depends(get_current_user)):
+    # 1. Validar que el nuevo nombre mantenga una extensión permitida para P-12
+    allowed_extensions = ['.docx', '.odt', '.rtf']
+    _, ext = os.path.splitext(request.newFilename)
+    if ext.lower() not in allowed_extensions:
+        raise HTTPException(
+            status_code=400, 
+            detail="Extensión inválida. El nuevo nombre debe terminar en .docx, .odt o .rtf"
+        )
+
+    # Sanitizar el nuevo nombre
+    clean_new_name = "".join([c if c.isalnum() or c in "._-" else "_" for c in request.newFilename])
+    
+    old_key = f"uploads/{filename}"
+    new_key = f"uploads/{clean_new_name}"
+
+    try:
+        # PASO 1: Copiar el objeto con el nuevo nombre
+        copy_source = {'Bucket': BUCKET_NAME, 'Key': old_key}
+        s3_client.copy_object(
+            CopySource=copy_source, 
+            Bucket=BUCKET_NAME, 
+            Key=new_key
+        )
+        
+        # PASO 2: Eliminar el objeto original
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=old_key)
+        
+        return {"message": f"Archivo renombrado exitosamente a {clean_new_name}"}
+        
+    except Exception as e:
+        import traceback
+        print("--- ERROR AL RENOMBRAR EN S3 ---")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Error interno al renombrar el archivo.")
 
 # ==========================================
 # ENDPOINTS PROTEGIDOS DE AWS S3 (SPRINT 2 + 3)
