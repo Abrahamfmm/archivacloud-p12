@@ -36,3 +36,14 @@ CORS: app.add_middleware(
     allow_methods=["*"], 
     allow_headers=["*"], 
 )
+
+5. Escaneo de seguridad (SEC-09)
+Backend (pip-audit): Se ejecutó el comando y no se encontraron vulnerabilidades críticas en las dependencias actuales.
+
+Frontend (npm audit): Se ejecutó el comando y el reporte se encuentra limpio.
+
+6. Feature Extra
+La funcionalidad de Renombrar permite al usuario cambiar el nombre de un archivo desde la lista del bucket. El backend recibe el nombre antiguo y el nuevo, realiza una operación copy_object en S3 con el nuevo nombre y luego ejecuta delete_object sobre el original, garantizando la persistencia y limpieza.
+
+7. Commits clave
+https://github.com/Abrahamfmm/archivacloud-p12/commits/main/

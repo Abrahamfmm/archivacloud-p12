@@ -109,45 +109,145 @@ const Upload = ({ token }) => {
   };
   
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-      <h2>ArchivaCloud P-12 - Sprint 3 (Seguridad)</h2>
+    <div style={{ 
+      padding: '30px', 
+      fontFamily: '"Inter", "Segoe UI", Arial, sans-serif',
+      color: '#e2e8f0',
+      maxWidth: '800px',
+      margin: '0 auto'
+    }}>
+      <h2 style={{ textAlign: 'center', marginBottom: '30px', color: '#f8fafc' }}>
+        ArchivaCloud P-12 - Panel de Archivos
+      </h2>
       
-      <div style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ccc', borderRadius: '8px' }}>
-        <h3>Subir Archivo</h3>
-        <input type="file" onChange={(e) => setFile(e.target.files[0])} />
-        <button onClick={handleUpload} style={{ marginLeft: '10px' }}>Subir a S3</button>
+      {/* SECCIÓN DE SUBIDA */}
+      <div style={{ 
+        marginBottom: '30px', 
+        padding: '25px', 
+        backgroundColor: '#1e293b', 
+        border: '1px solid #334155', 
+        borderRadius: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+      }}>
+        <h3 style={{ marginTop: '0', color: '#38bdf8', marginBottom: '20px' }}>Subir Nuevo Archivo</h3>
+        
+        <div style={{ display: 'flex', gap: '15px', alignItems: 'center', width: '100%', justifyContent: 'center', flexWrap: 'wrap' }}>
+          {/* Botón de archivo personalizado */}
+          <label style={{ 
+            padding: '10px 20px', 
+            backgroundColor: '#0f172a', 
+            border: '1px dashed #475569',
+            borderRadius: '6px', 
+            cursor: 'pointer',
+            color: file ? '#38bdf8' : '#94a3b8',
+            transition: 'border-color 0.2s',
+            textAlign: 'center',
+            minWidth: '200px'
+          }}>
+            {file ? file.name : '📄 Seleccionar archivo...'}
+            <input 
+              type="file" 
+              style={{ display: 'none' }} 
+              onChange={(e) => setFile(e.target.files[0])} 
+            />
+          </label>
+
+          <button 
+            onClick={handleUpload} 
+            disabled={!file}
+            style={{ 
+              padding: '10px 24px', 
+              backgroundColor: file ? '#3b82f6' : '#475569', 
+              color: 'white',
+              border: 'none', 
+              borderRadius: '6px',
+              cursor: file ? 'pointer' : 'not-allowed',
+              fontWeight: 'bold',
+              transition: 'background-color 0.2s'
+            }}
+          >
+            Subir a S3
+          </button>
+        </div>
       </div>
 
-      <h3>Archivos en el Bucket</h3>
+      {/* SECCIÓN DE LISTA DE ARCHIVOS */}
+      <h3 style={{ color: '#f8fafc', borderBottom: '1px solid #334155', paddingBottom: '10px', marginBottom: '20px' }}>
+        Archivos en el Bucket
+      </h3>
+      
       {fileList.length === 0 ? (
-        <p>No hay archivos todavía.</p>
+        <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#1e293b', borderRadius: '12px', color: '#94a3b8' }}>
+          No hay archivos subidos todavía.
+        </div>
       ) : (
-        <ul>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {fileList.map((f, index) => (
-            <li key={index} style={{ marginBottom: '10px' }}>
-              <a href={f.url} target="_blank" rel="noopener noreferrer">
-                {f.filename}
-              </a>
-              {" "} - {(f.size / 1024).toFixed(2)} KB {" "}
+            <div key={index} style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              padding: '15px 20px', 
+              backgroundColor: '#1e293b', 
+              borderRadius: '8px',
+              border: '1px solid #334155',
+              transition: 'transform 0.1s',
+            }}>
+              {/* Info del archivo */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <a 
+                  href={f.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ color: '#e2e8f0', textDecoration: 'none', fontWeight: '500', fontSize: '15px' }}
+                >
+                  {f.filename}
+                </a>
+                <span style={{ color: '#64748b', fontSize: '13px', backgroundColor: '#0f172a', padding: '4px 8px', borderRadius: '4px' }}>
+                  {(f.size / 1024).toFixed(2)} KB
+                </span>
+              </div>
               
-              {/* Botón Renombrar (Feature P-12) */}
-              <button 
-                onClick={() => handleRename(f.filename)} 
-                style={{ color: 'black', backgroundColor: '#ffc107', border: 'none', marginLeft: '15px', cursor: 'pointer', padding: '2px 8px', borderRadius: '4px' }}
-              >
-                Renombrar
-              </button>
+              {/* Contenedor de Botones de Acción */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  onClick={() => handleRename(f.filename)} 
+                  style={{ 
+                    color: '#fff', 
+                    backgroundColor: '#f59e0b', // Naranja/Amarillo moderno
+                    border: 'none', 
+                    cursor: 'pointer', 
+                    padding: '8px 12px', 
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Renombrar
+                </button>
 
-              {/* Botón Borrar */}
-              <button 
-                onClick={() => handleDelete(f.filename)} 
-                style={{ color: 'white', backgroundColor: '#dc3545', border: 'none', marginLeft: '5px', cursor: 'pointer', padding: '2px 8px', borderRadius: '4px' }}
-              >
-                Borrar
-              </button>
-            </li>
+                <button 
+                  onClick={() => handleDelete(f.filename)} 
+                  style={{ 
+                    color: 'white', 
+                    backgroundColor: '#ef4444', // Rojo moderno
+                    border: 'none', 
+                    cursor: 'pointer', 
+                    padding: '8px 12px', 
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Borrar
+                </button>
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
