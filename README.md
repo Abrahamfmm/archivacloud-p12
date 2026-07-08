@@ -12,7 +12,7 @@ Bucket / Región: archivacloud-p12 / us-east-2
 Feature extra: Renombrar archivos (copia con nuevo nombre y elimina el anterior).
 
 2. Arquitectura
-
+![Diagrama de Arquitectura](docs/Diagramadearquitectura.png)
 3. Stack Tecnológico
 Backend: Python 3.10+, FastAPI, Uvicorn, Boto3, Pydantic.
 
