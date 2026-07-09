@@ -27,7 +27,7 @@ const Upload = ({ token }) => {
   const handleUpload = async () => {
     if (!file) return;
 
-    // --- NUEVO: Control SEC-04 (Límite de 14 MB para P-12) ---
+    // --- Control SEC-04 (Límite de 14 MB para P-12) ---
     const maxSizeInBytes = 14 * 1024 * 1024; // 14 MB en bytes
     if (file.size > maxSizeInBytes) {
       alert("Error de seguridad: El archivo excede el límite permitido de 14 MB.");
@@ -60,6 +60,19 @@ const Upload = ({ token }) => {
       }
 
       alert('¡Archivo subido con éxito a AWS S3!');
+
+      // --- NUEVO: Guardar metadata en DynamoDB ---
+      try {
+        await axios.post('http://127.0.0.1:8000/api/files/metadata', null, {
+          params: { file_name: file.name },
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        console.log("Metadata guardada en DynamoDB exitosamente.");
+      } catch (metaError) {
+        console.error("El archivo subió a S3, pero hubo un error al guardar la metadata en DynamoDB:", metaError);
+      }
+      // -------------------------------------------
+
       setFile(null); 
       fetchFiles(); 
       

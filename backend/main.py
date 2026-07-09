@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
-
+from datetime import datetime
 # Importaciones de nuestro nuevo módulo de seguridad (Sprint 3)
 from auth import get_password_hash, verify_password, create_access_token, get_current_user
 
@@ -58,7 +58,14 @@ s3_client = boto3.client(
     endpoint_url=f"https://s3.{aws_region}.amazonaws.com" if aws_region else None,
     config=Config(signature_version='s3v4')
 )
-
+dynamodb_resource = boto3.resource(
+    'dynamodb',
+    region_name=os.getenv('AWS_REGION'),
+    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+    aws_session_token=os.getenv('AWS_SESSION_TOKEN')
+)
+table = dynamodb_resource.Table('ArchivaCloudMetadata')
 # ==========================================
 # MODELOS DE DATOS (Pydantic)
 # ==========================================
@@ -76,6 +83,21 @@ class RenameRequest(BaseModel):
 # ==========================================
 # ENDPOINTS DE AUTENTICACIÓN (SPRINT 3)
 # ==========================================
+@app.post("/api/files/metadata")
+def save_file_metadata(file_name: str, user: str = Depends(get_current_user)):
+    try:
+        table.put_item(
+            Item={
+                'file_name': file_name,
+                'uploaded_by': user,
+                'timestamp': datetime.utcnow().isoformat()
+            }
+        )
+        return {"message": "Metadata guardada en DynamoDB"}
+    except Exception as e:
+        print(f"Error guardando en Dynamo: {e}")
+        raise HTTPException(status_code=500, detail="Error al guardar metadata")
+    
 @app.post("/api/auth/register")
 def register(user: UserAuth):
     if user.username in DB_USUARIOS:
